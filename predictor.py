@@ -145,9 +145,9 @@ class PythonPredictor:
         self.s3_resource_upload.Object(self.BUCKET, save_path).put(Body=pickle_byte_obj)
 
         # update status in mongo collection
-        update_query = { 'uuid' : uuid }
-        new_value = { '$set': { 'processStatus': 'true' } }
-        self.files_collection.update_one(update_query, new_value)
+        self.update_query = { 'uuid' : uuid }
+        self.new_value = { '$set': { 'processStatus': 'true' } }
+        self.files_collection.update_one(self.update_query, self.new_value)
 
 
   
