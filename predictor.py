@@ -69,7 +69,7 @@ class PythonPredictor:
             print('\n\naws sqs client error:', ex)
             exit('Failed to connect to sqs, terminating.')
 
-        self.queues = self.sqs_client.list_queues(QueueNamePrefix=QUEUE_NAME) # we filter to narrow down the list
+        self.queues = self.sqs_client.list_queues(QueueNamePrefix=self.QUEUE_NAME) # we filter to narrow down the list
         self.test_queue_url = self.queues['QueueUrls'][0]
 
         # mongo collection client
@@ -118,7 +118,7 @@ class PythonPredictor:
 
         # download text file for processing
         print('\n\n✍️ downloading the text file ✍️')
-        self.s3.download_file(BUCKET, 'v2/'+uuid+'/text_content.txt', 'v2/'+uuid+'/text_content.txt')
+        self.s3.download_file(self.BUCKET, 'v2/'+uuid+'/text_content.txt', 'v2/'+uuid+'/text_content.txt')
 
 
         with open('v2/'+uuid+'/text_content.txt', 'r') as file:
@@ -141,8 +141,8 @@ class PythonPredictor:
         save_path = os.path.join('v2', uuid, 'corpus_encode.npy')
         pickle_byte_obj = pickle.dumps(corpus_embeddings)
         print('job almost finished 😁, uploading to 🌥️ ')
-        self.s3_resource_upload.Object(BUCKET, 'v2/'+uuid+'/topNwords.json').put(Body=json.dumps(top_n_dict, indent=1)) 
-        self.s3_resource_upload.Object(BUCKET, save_path).put(Body=pickle_byte_obj)
+        self.s3_resource_upload.Object(self.BUCKET, 'v2/'+uuid+'/topNwords.json').put(Body=json.dumps(top_n_dict, indent=1)) 
+        self.s3_resource_upload.Object(self.BUCKET, save_path).put(Body=pickle_byte_obj)
 
         # update status in mongo collection
         update_query = { 'uuid' : uuid }
