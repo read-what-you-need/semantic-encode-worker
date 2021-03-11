@@ -69,8 +69,8 @@ class PythonPredictor:
             print('\n\naws sqs client error:', ex)
             exit('Failed to connect to sqs, terminating.')
 
-        self.queues = sqs_client.list_queues(QueueNamePrefix=QUEUE_NAME) # we filter to narrow down the list
-        self.test_queue_url = queues['QueueUrls'][0]
+        self.queues = self.sqs_client.list_queues(QueueNamePrefix=QUEUE_NAME) # we filter to narrow down the list
+        self.test_queue_url = self.queues['QueueUrls'][0]
 
         # mongo collection client
         self.mongo_client = pymongo.MongoClient(self.mongo_uri)
