@@ -99,7 +99,7 @@ class PythonPredictor:
                     self.worker_job_encode(self.uuid)
         
                     # next, we delete the message from the queue so no one else will process it again
-                    self.sqs_client.delete_message(QueueUrl=self.est_queue_url,ReceiptHandle=message['ReceiptHandle'])
+                    self.sqs_client.delete_message(QueueUrl=self.test_queue_url,ReceiptHandle=message['ReceiptHandle'])
                     
                     print('-----------------------------------------')
             else:
