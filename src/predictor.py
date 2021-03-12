@@ -27,7 +27,7 @@ from utils import helper_functions
 
 class PythonPredictor:
 
-    def __init__(self, config):
+    def __init__(self):
 
         # download the information retrieval model trained on MS-MARCO dataset
         self.embedder = SentenceTransformer('distilroberta-base-msmarco-v2')

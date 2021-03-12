@@ -13,4 +13,4 @@ COPY . .
 
 
 
-CMD ["python3", "predictor.py"]
+CMD ["python3","-u", "./src/predictor.py"]
