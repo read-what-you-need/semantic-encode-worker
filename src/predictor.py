@@ -84,6 +84,7 @@ class PythonPredictor:
             shutil.rmtree(self.dir)
         os.makedirs(self.dir)         
 
+        print('Initializing worker job. ..')
 
         while True:
             messages = self.sqs_client.receive_message(QueueUrl=self.test_queue_url,MaxNumberOfMessages=1, VisibilityTimeout=120) # adjust MaxNumberOfMessages if needed
@@ -152,14 +153,5 @@ class PythonPredictor:
 
   
 
-    def predict(self, payload):
-        
-        # extract values from the request payload
-        
-        # sess stores a file's uuid
-        # a unique identifier to link to an uploaded file's text file, encodings and top words
-        
-
-        response = "worker online"
-        
-        return response
+if __name__ == "__main__":
+    predictor = PythonPredictor()
