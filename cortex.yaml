@@ -9,5 +9,5 @@
   networking:
     local_port: 8893
   compute:
-    cpu: 1
-    # gpu: 1 # this is optional, since the api can also run on cpu
+    #cpu: 1
+    gpu: 1 # this is optional, since the api can also run on cpu
