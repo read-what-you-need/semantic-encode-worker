@@ -1,6 +1,7 @@
 # ignore local development files
 models/
 tmp/
+nlp-semantic-env/
 test
 
 # Byte-compiled / optimized / DLL files

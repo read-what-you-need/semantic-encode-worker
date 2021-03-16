@@ -1,5 +1,6 @@
-# this is an example for cortex release 0.21 and may not deploy correctly on other releases of cortex
-import boto3
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import os
 import time
 import shutil
@@ -7,16 +8,20 @@ import glob
 import re
 import math
 import numpy as np
+import torch
 import scipy.spatial
 from sklearn.cluster import KMeans
 from sentence_transformers import SentenceTransformer
 from collections import Counter, OrderedDict 
+from dotenv import load_dotenv
 
 import json
 
 import io
 import numpy
 import pickle
+
+import boto3
 
 import pymongo
 import datetime
@@ -25,14 +30,18 @@ from bson.objectid import ObjectId
 from utils import helper_functions 
 
 
+
+
 class PythonPredictor:
 
-    def __init__(self, config):
+    def __init__(self):
 
         # download the information retrieval model trained on MS-MARCO dataset
-        self.embedder = SentenceTransformer('distilroberta-base-msmarco-v2')
+        #self.embedder = SentenceTransformer('distilroberta-base-msmarco-v2')
+        self.embedder = SentenceTransformer('./models/distilroberta-base-msmarco-v2', device="cuda")
         
         # set the environment variables
+        load_dotenv()
         self.aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
         self.aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         self.aws_region_name = os.getenv('AWS_REGION_NAME')
@@ -84,6 +93,7 @@ class PythonPredictor:
             shutil.rmtree(self.dir)
         os.makedirs(self.dir)         
 
+        print('Initializing worker job. ..')
 
         while True:
             messages = self.sqs_client.receive_message(QueueUrl=self.test_queue_url,MaxNumberOfMessages=1, VisibilityTimeout=120) # adjust MaxNumberOfMessages if needed
@@ -104,7 +114,7 @@ class PythonPredictor:
                     print('-----------------------------------------')
             else:
                 print('Queue is now empty')
-                time.sleep(30)
+                time.sleep(10)
 
 
     def worker_job_encode(self, uuid):
@@ -121,7 +131,7 @@ class PythonPredictor:
         self.s3.download_file(self.BUCKET, 'v2/'+uuid+'/text_content.txt', 'v2/'+uuid+'/text_content.txt')
 
 
-        with open('v2/'+uuid+'/text_content.txt', 'r') as file:
+        with open('v2/'+uuid+'/text_content.txt', 'r', encoding="utf8") as file:
             file_list = file.read()
 
         top_n_dict = helper_functions.top_n_words(file_list)
@@ -138,11 +148,10 @@ class PythonPredictor:
         corpus_embeddings = self.embedder.encode(corpus, show_progress_bar=True)
 
         # save embeddings to s3
-        save_path = os.path.join('v2', uuid, 'corpus_encode.npy')
         pickle_byte_obj = pickle.dumps(corpus_embeddings)
         print('job almost finished 😁, uploading to 🌥️ ')
         self.s3_resource_upload.Object(self.BUCKET, 'v2/'+uuid+'/topNwords.json').put(Body=json.dumps(top_n_dict, indent=1)) 
-        self.s3_resource_upload.Object(self.BUCKET, save_path).put(Body=pickle_byte_obj)
+        self.s3_resource_upload.Object(self.BUCKET, 'v2/' +uuid+'/corpus_encode.npy').put(Body=pickle_byte_obj)
 
         # update status in mongo collection
         self.update_query = { 'uuid' : uuid }
@@ -152,14 +161,13 @@ class PythonPredictor:
 
   
 
-    def predict(self, payload):
-        
-        # extract values from the request payload
-        
-        # sess stores a file's uuid
-        # a unique identifier to link to an uploaded file's text file, encodings and top words
-        
+if __name__ == "__main__":
+    
+    print("GPU available status ",torch.cuda.is_available())
 
-        response = "worker online"
-        
-        return response
+
+    print("gpu device name :",  torch.cuda.get_device_name(0))
+
+    
+
+    predictor = PythonPredictor()
