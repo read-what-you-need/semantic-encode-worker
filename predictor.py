@@ -128,12 +128,12 @@ class PythonPredictor:
                     
                     print('-----------------------------------------')
             else:
-                    try:
-                        requests.get(self.monitor_URL, timeout=5)
-                    except requests.RequestException as e:
-                        # Log ping failure here...
-                        print("failed to update alive status: %s" % e)
-                        pass
+                try:
+                    requests.get(self.monitor_URL, timeout=5)
+                except requests.RequestException as e:
+                    # Log ping failure here...
+                    print("failed to update alive status: %s" % e)
+                    pass
                     
                 print('Queue is now empty')
                 time.sleep(10)
