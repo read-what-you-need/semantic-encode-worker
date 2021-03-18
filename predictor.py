@@ -99,19 +99,21 @@ class PythonPredictor:
         print('Initializing worker job. ..')
 
         while True:
+            
+            
+             # send heartbeat to update alive status
+            try:
+                requests.get(self.monitor_URL, timeout=5)
+            except requests.RequestException as e:
+                # Log ping failure here...
+                print("failed to update alive status: %s" % e)
+                pass
+        
                    
             messages = self.sqs_client.receive_message(QueueUrl=self.test_queue_url,MaxNumberOfMessages=1, VisibilityTimeout=120) # adjust MaxNumberOfMessages if needed
             if 'Messages' in messages: # when the queue is exhausted, the response dict contains no 'Messages' key
                 for message in messages['Messages']: # 'Messages' is a list
                     
-                    # send heartbeat to update alive status
-                    try:
-                        requests.get(self.monitor_URL+ "/start", timeout=5)
-                    except requests.RequestException as e:
-                        # Log ping failure here...
-                        print("failed to update alive status: %s" % e)
-                        pass
-        
                     self.uuid = message['Body']
         
                     # process the messages
@@ -122,18 +124,10 @@ class PythonPredictor:
         
                     # next, we delete the message from the queue so no one else will process it again
                     self.sqs_client.delete_message(QueueUrl=self.test_queue_url,ReceiptHandle=message['ReceiptHandle'])
-                    
-                    # Signal success to monitor application
-                    requests.get(self.monitor_URL)
-                    
+
                     print('-----------------------------------------')
+                    
             else:
-                try:
-                    requests.get(self.monitor_URL, timeout=5)
-                except requests.RequestException as e:
-                    # Log ping failure here...
-                    print("failed to update alive status: %s" % e)
-                    pass
                     
                 print('Queue is now empty')
                 time.sleep(10)
