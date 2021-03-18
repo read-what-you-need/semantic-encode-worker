@@ -48,7 +48,7 @@ class PythonPredictor:
         self.mongo_uri = os.getenv('MONGO_URI')
         
         # monitoring end point
-        self.monitor_URL = "https://hc-ping.com/your-uuid-here"
+        self.monitor_URL = os.getenv('MONITOR_URL')
 
                 
         self.QUEUE_NAME='readneed_encode_jobs.fifo'
