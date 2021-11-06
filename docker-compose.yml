@@ -1,0 +1,10 @@
+version: '3'
+services:
+    encode-worker:
+        env_file:
+        - .env
+        build:
+            context: .
+        volumes:
+            - ./:/code/app
+            - ./v2:/code/app/v2

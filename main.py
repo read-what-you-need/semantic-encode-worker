@@ -1,5 +1,3 @@
-# this is an example for cortex release 0.21 and may not deploy correctly on other releases of cortex
-import boto3
 import os
 import time
 import shutil
@@ -18,29 +16,48 @@ import io
 import numpy
 import pickle
 
-import pymongo
 import datetime
-from bson.objectid import ObjectId
+
+import boto3
+import requests
 
 from utils import helper_functions 
 
 
+
+# initializing environment variables
+aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
+aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+aws_region_name = os.getenv('AWS_REGION_NAME')
+
+
+# connect with the s3 resource to dump embeddings and text files
+s3 = boto3.resource("s3", aws_access_key_id=aws_access_key_id , aws_secret_access_key=aws_secret_access_key)
+client = boto3.client('sqs',  aws_access_key_id=aws_access_key_id , aws_secret_access_key=aws_secret_access_key, region_name=aws_region_name)
+
+# initialize amazon sqs queue here
+queues = client.list_queues(QueueNamePrefix='readneed_encode_jobs.fifo') # we filter to narrow down the list
+readneed_encode_jobs_url = queues['QueueUrls'][0]
+
+
+
 class PythonPredictor:
 
-    def __init__(self, config):
+    def __init__(self):
 
         # download the information retrieval model trained on MS-MARCO dataset
-        self.embedder = SentenceTransformer('distilroberta-base-msmarco-v2')
+        self.embedder = SentenceTransformer('./models/distilroberta-base-msmarco-v2')
         
         # set the environment variables
         self.aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
         self.aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         self.aws_region_name = os.getenv('AWS_REGION_NAME')
-        self.mongo_uri = os.getenv('MONGO_URI')
+        self.node_api = os.getenv('NODE_API');
 
                 
         self.QUEUE_NAME='readneed_encode_jobs.fifo'
         self.BUCKET='readneedobjects'
+
 
         # establish connection with s3 bucket
         try:  
@@ -73,17 +90,13 @@ class PythonPredictor:
         self.test_queue_url = self.queues['QueueUrls'][0]
 
         # mongo collection client
-        self.mongo_client = pymongo.MongoClient(self.mongo_uri)
-        self.DB = self.mongo_client['readneed']
-        self.files_collection = self.DB['files']
-        
+
         # create temp dir for storing embeddings 
         self.dir = 'v2'
 
         if os.path.exists(self.dir):
             shutil.rmtree(self.dir)
         os.makedirs(self.dir)         
-
 
         while True:
             messages = self.sqs_client.receive_message(QueueUrl=self.test_queue_url,MaxNumberOfMessages=1, VisibilityTimeout=120) # adjust MaxNumberOfMessages if needed
@@ -115,23 +128,17 @@ class PythonPredictor:
         except Exception as e:
             pass
 
-
         # download text file for processing
         print('\n\n✍️ downloading the text file ✍️')
-        self.s3.download_file(self.BUCKET, 'v2/'+uuid+'/text_content.txt', 'v2/'+uuid+'/text_content.txt')
+        self.s3.download_file(self.BUCKET, 'v2/'+uuid+'/file.txt', 'v2/'+uuid+'/file.txt')
 
-
-        with open('v2/'+uuid+'/text_content.txt', 'r') as file:
+        with open('v2/'+uuid+'/file.txt', 'r') as file:
             file_list = file.read()
 
         top_n_dict = helper_functions.top_n_words(file_list)
             
-
-
         print('cleaning up the file a bit 👀')
         corpus = helper_functions.payload_text_preprocess(file_list)
-
-
 
         # heavy bottle neck, magic happes here
         print(' ⭐ processing the text file ⭐ ')
@@ -144,22 +151,11 @@ class PythonPredictor:
         self.s3_resource_upload.Object(self.BUCKET, 'v2/'+uuid+'/topNwords.json').put(Body=json.dumps(top_n_dict, indent=1)) 
         self.s3_resource_upload.Object(self.BUCKET, save_path).put(Body=pickle_byte_obj)
 
-        # update status in mongo collection
-        self.update_query = { 'uuid' : uuid }
-        self.new_value = { '$set': { 'processStatus': 'true' } }
-        self.files_collection.update_one(self.update_query, self.new_value)
+        # update status by informing to node api
+        requests.post(self.node_api+"file/process/"+uuid,
+        headers = {u'content-type': u'application/json'}, 
+        data=json.dumps({"process": True}))
 
 
-  
 
-    def predict(self, payload):
-        
-        # extract values from the request payload
-        
-        # sess stores a file's uuid
-        # a unique identifier to link to an uploaded file's text file, encodings and top words
-        
-
-        response = "worker online"
-        
-        return response
+PythonPredictor()
