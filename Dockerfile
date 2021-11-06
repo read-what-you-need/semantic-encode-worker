@@ -1,4 +1,4 @@
-FROM python:3.9
+FROM nvidia/cuda:11.2.1-runtime-ubuntu20.04
 
 LABEL maintainer="READ-NEED Core Maintainers <deeps@readneed.org>"
 
