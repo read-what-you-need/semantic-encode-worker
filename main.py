@@ -10,19 +10,20 @@ from sklearn.cluster import KMeans
 from sentence_transformers import SentenceTransformer
 from collections import Counter, OrderedDict 
 
-import json
+import requests
 
 import io
+import json
 import numpy
 import pickle
 
 import datetime
 
 import boto3
-import requests
-
+from kafka import KafkaConsumer
+from kafka import KafkaProducer
+from kafka.errors import KafkaError
 from utils import helper_functions 
-
 
 
 # initializing environment variables
@@ -31,15 +32,8 @@ aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 aws_region_name = os.getenv('AWS_REGION_NAME')
 
 
-# connect with the s3 resource to dump embeddings and text files
-s3 = boto3.resource("s3", aws_access_key_id=aws_access_key_id , aws_secret_access_key=aws_secret_access_key)
-client = boto3.client('sqs',  aws_access_key_id=aws_access_key_id , aws_secret_access_key=aws_secret_access_key, region_name=aws_region_name)
-
-# initialize amazon sqs queue here
-queues = client.list_queues(QueueNamePrefix='readneed_encode_jobs.fifo') # we filter to narrow down the list
-readneed_encode_jobs_url = queues['QueueUrls'][0]
-
-
+# deserializers
+stringDeserializer = lambda m: m.decode('utf-8')
 
 class PythonPredictor:
 
@@ -52,14 +46,16 @@ class PythonPredictor:
         self.aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
         self.aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
         self.aws_region_name = os.getenv('AWS_REGION_NAME')
-        self.node_api = os.getenv('NODE_API');
-
                 
-        self.QUEUE_NAME='readneed_encode_jobs.fifo'
-        self.BUCKET='readneedobjects'
+        self.BUCKET_NAME= os.getenv('AWS_FILES_BUCKET_NAME');
+
+        self.kafka_broker_host=os.getenv('KAFKA_BROKER_HOST');
+        self.kafka_group_id = os.getenv('KAFKA_GROUP_ID');
+        self.kafka_consumer_topic_name = os.getenv('KAFKA_CONSUMER_TOPIC_NAME');
+        self.kafka_producer_topic_name = os.getenv('KAFKA_PRODUCER_TOPIC_NAME');
 
 
-        # establish connection with s3 bucket
+        # establish connection with s3 BUCKET
         try:  
             self.s3 = boto3.client('s3', aws_access_key_id=self.aws_access_key_id , 
             aws_secret_access_key=self.aws_secret_access_key, 
@@ -69,27 +65,28 @@ class PythonPredictor:
             aws_secret_access_key=self.aws_secret_access_key, 
             region_name=self.aws_region_name)
 
-            print('Connected to s3 bucket!')
+            print('Connected to s3 BUCKET!')
         except Exception as ex:
             print('\n\naws client error:', ex)
-            exit('Failed to connect to s3 bucket, terminating.')
+            exit('Failed to connect to s3 BUCKET, terminating.')
 
-        # establish connection with sqs client
+
+        # establish connection with kafka broker
         try:
-            self.sqs_client = boto3.client('sqs', aws_access_key_id=self.aws_access_key_id , 
-            aws_secret_access_key=self.aws_secret_access_key, 
-            region_name=self.aws_region_name)
+            self.kafka_consumer = KafkaConsumer(self.kafka_consumer_topic_name,
+                         group_id=self.kafka_group_id,
+                         bootstrap_servers=[self.kafka_broker_host],
+                         key_deserializer= stringDeserializer,
+                         value_deserializer=stringDeserializer)
+            print('kakfa consumer connected')
 
-            print('Connected to sqs queue!')
+            self.kafka_producer = KafkaProducer(bootstrap_servers=[self.kafka_broker_host])
+            print('kakfa producer connected')
 
         except Exception as ex:
-            print('\n\naws sqs client error:', ex)
-            exit('Failed to connect to sqs, terminating.')
+            print('\n\nkafka client error:', ex)
+            exit('Failed: Consumer/producer unable to connect to kafka broker, terminating.')
 
-        self.queues = self.sqs_client.list_queues(QueueNamePrefix=self.QUEUE_NAME) # we filter to narrow down the list
-        self.test_queue_url = self.queues['QueueUrls'][0]
-
-        # mongo collection client
 
         # create temp dir for storing embeddings 
         self.dir = 'v2'
@@ -98,26 +95,22 @@ class PythonPredictor:
             shutil.rmtree(self.dir)
         os.makedirs(self.dir)         
 
-        while True:
-            messages = self.sqs_client.receive_message(QueueUrl=self.test_queue_url,MaxNumberOfMessages=1, VisibilityTimeout=120) # adjust MaxNumberOfMessages if needed
-            if 'Messages' in messages: # when the queue is exhausted, the response dict contains no 'Messages' key
-                for message in messages['Messages']: # 'Messages' is a list
-        
-                    self.uuid = message['Body']
-        
-                    # process the messages
-                    print('\njob request for UUID '+ self.uuid)
-        
-                    # call worker process
-                    self.worker_job_encode(self.uuid)
-        
-                    # next, we delete the message from the queue so no one else will process it again
-                    self.sqs_client.delete_message(QueueUrl=self.test_queue_url,ReceiptHandle=message['ReceiptHandle'])
-                    
-                    print('-----------------------------------------')
-            else:
-                print('Queue is now empty')
-                time.sleep(30)
+        for message in self.kafka_consumer:
+            print ("recieved message in topic: %s: key=%s value=%s" % (message.topic, message.key, message.value))
+       
+            self.uuid = message.value
+
+            # process the message
+            print('\njob request for UUID '+ self.uuid)
+
+            # call worker process
+            self.worker_job_encode(self.uuid)
+
+            # invoke producer to signal job finished
+            self.producer_emit_job_finished_event(self.uuid)
+
+            print('-----------------------------------------')
+
 
 
     def worker_job_encode(self, uuid):
@@ -130,7 +123,7 @@ class PythonPredictor:
 
         # download text file for processing
         print('\n\n✍️ downloading the text file ✍️')
-        self.s3.download_file(self.BUCKET, 'v2/'+uuid+'/file.txt', 'v2/'+uuid+'/file.txt')
+        self.s3.download_file(self.BUCKET_NAME, 'v2/'+uuid+'/file.txt', 'v2/'+uuid+'/file.txt')
 
         with open('v2/'+uuid+'/file.txt', 'r') as file:
             file_list = file.read()
@@ -148,14 +141,25 @@ class PythonPredictor:
         save_path = os.path.join('v2', uuid, 'corpus_encode.npy')
         pickle_byte_obj = pickle.dumps(corpus_embeddings)
         print('job almost finished 😁, uploading to 🌥️ ')
-        self.s3_resource_upload.Object(self.BUCKET, 'v2/'+uuid+'/topNwords.json').put(Body=json.dumps(top_n_dict, indent=1)) 
-        self.s3_resource_upload.Object(self.BUCKET, save_path).put(Body=pickle_byte_obj)
+        self.s3_resource_upload.Object(self.BUCKET_NAME, 'v2/'+uuid+'/topNwords.json').put(Body=json.dumps(top_n_dict, indent=1)) 
+        self.s3_resource_upload.Object(self.BUCKET_NAME, save_path).put(Body=pickle_byte_obj)
 
-        # update status by informing to node api
-        requests.post(self.node_api+"file/process/"+uuid,
-        headers = {u'content-type': u'application/json'}, 
-        data=json.dumps({"process": True}))
 
+    def producer_emit_job_finished_event(self, uuid):
+
+        # Asynchronous by default
+        future = self.kafka_producer.send(self.kafka_producer_topic_name, bytes(uuid, 'utf-8'))
+
+        # Block for 'synchronous' sends
+        try:
+            record_metadata = future.get(timeout=5)
+        except KafkaError:
+            # Decide what to do if produce request failed...
+            print("kafka_producer send failed for uuid:", uuid)
+            pass
+
+        # Successful result returns assigned partition and offset
+        print("message sent to topic:%s partition:%s offset:%s:" % (record_metadata.topic, record_metadata.partition, record_metadata.offset))        
 
 
 PythonPredictor()
