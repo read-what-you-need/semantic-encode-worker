@@ -10,7 +10,7 @@ RUN apt update && \
 
 COPY ./requirements.txt /code/requirements.txt
 
-RUN python3.8 -m pip install --upgrade pip && \
+RUN python3.8 -m pip install --upgrade pip setuptools wheel && \
     python3.8 -m pip install --no-cache-dir -r /code/requirements.txt
 
 COPY ./ /code/
