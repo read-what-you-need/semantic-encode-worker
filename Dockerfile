@@ -1,5 +1,7 @@
 FROM nvidia/cuda:10.1-cudnn7-runtime
 
+WORKDIR /code
+
 RUN apt update && \
     apt install --no-install-recommends -y build-essential software-properties-common && \
     add-apt-repository -y ppa:deadsnakes/ppa && \
