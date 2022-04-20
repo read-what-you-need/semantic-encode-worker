@@ -4,7 +4,8 @@ sentencepiece==0.1.94
 tokenizers==0.10.3
 transformers==4.12.3
 boto3==1.17.28
-numpy==1.21.4
+numpy==1.22.3
+scipy==1.8.0
 kafka-python==2.0.2
 crc32c
 lz4

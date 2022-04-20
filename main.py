@@ -4,7 +4,6 @@ import shutil
 import glob
 import re
 import math
-import numpy as np
 import scipy.spatial
 from sklearn.cluster import KMeans
 from sentence_transformers import SentenceTransformer
@@ -14,7 +13,6 @@ import requests
 
 import io
 import json
-import numpy
 import pickle
 
 import datetime
