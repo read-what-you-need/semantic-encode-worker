@@ -46,7 +46,7 @@ class PythonPredictor:
     def __init__(self):
 
         # download the information retrieval model trained on MS-MARCO dataset
-        self.embedder = SentenceTransformer('distilroberta-base-msmarco-v2', device=device_type)
+        self.embedder = SentenceTransformer(model_path, device=device_type)
         
         # set the environment variables
         self.aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
