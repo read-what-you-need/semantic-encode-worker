@@ -1,13 +1,17 @@
-version: '3'
+version: '3.8'
 services:
     encode-worker:
         env_file:
         - .env
+        deploy:
+            resources:
+              reservations:
+                devices:
+                - driver: nvidia
+                  count: all
+                  capabilities: [gpu]
         build:
             context: .
         volumes:
             - ./:/code/app
             - ./v2:/code/app/v2
-        environment:
-            - CUDA_VISIBLE_DEVICES=1
-        ipc: "host"
