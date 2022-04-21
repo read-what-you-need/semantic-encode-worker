@@ -36,7 +36,7 @@ if environment_type == "dev":
     model_path= './models/distilroberta-base-msmarco-v2'
 if environment_type == "prod":
     model_path= 'distilroberta-base-msmarco-v2'
-
+print('loading service ', device_type)
 
 # deserializers
 stringDeserializer = lambda m: m.decode('utf-8')
