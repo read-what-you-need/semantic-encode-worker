@@ -7,6 +7,7 @@ ENV LC_ALL C.UTF-8
 RUN pip install --global-option="--cpp_ext" --global-option="--cuda_ext" git+https://github.com/NVIDIA/apex.git#egg=apex
 
 ## FROM python:3.9
+FROM nvidia/cuda:11.6-base
 
 LABEL maintainer="READ-NEED Core Maintainers <deeps@readneed.org>"
 
