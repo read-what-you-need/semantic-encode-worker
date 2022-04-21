@@ -3,6 +3,8 @@ services:
     encode-worker:
         env_file:
         - .env
+        # remove the privileged option if it causes error
+        privileged: true
         deploy:
             resources:
               reservations:
