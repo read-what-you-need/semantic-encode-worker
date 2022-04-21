@@ -4,7 +4,6 @@ import shutil
 import glob
 import re
 import math
-import numpy as np
 import scipy.spatial
 from sklearn.cluster import KMeans
 from sentence_transformers import SentenceTransformer
@@ -14,7 +13,6 @@ import requests
 
 import io
 import json
-import numpy
 import pickle
 
 import datetime
@@ -31,6 +29,14 @@ aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
 aws_secret_access_key = os.getenv('AWS_SECRET_ACCESS_KEY')
 aws_region_name = os.getenv('AWS_REGION_NAME')
 
+environment_type = os.getenv('env')
+device_type = os.getenv('device')
+
+if environment_type == "dev":
+    model_path= './models/distilroberta-base-msmarco-v2'
+if environment_type == "prod":
+    model_path= 'distilroberta-base-msmarco-v2'
+
 
 # deserializers
 stringDeserializer = lambda m: m.decode('utf-8')
@@ -40,7 +46,7 @@ class PythonPredictor:
     def __init__(self):
 
         # download the information retrieval model trained on MS-MARCO dataset
-        self.embedder = SentenceTransformer('./models/distilroberta-base-msmarco-v2')
+        self.embedder = SentenceTransformer('distilroberta-base-msmarco-v2', device=device_type)
         
         # set the environment variables
         self.aws_access_key_id = os.getenv('AWS_ACCESS_KEY_ID')
