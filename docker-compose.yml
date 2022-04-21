@@ -8,3 +8,6 @@ services:
         volumes:
             - ./:/code/app
             - ./v2:/code/app/v2
+        environment:
+            - CUDA_VISIBLE_DEVICES=1
+        ipc: "host"
