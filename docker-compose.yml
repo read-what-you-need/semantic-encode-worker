@@ -5,6 +5,8 @@ services:
         - .env
         # remove the privileged option if it causes error
         privileged: true
+        restart:
+            always
         deploy:
             resources:
               reservations:

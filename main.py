@@ -59,6 +59,7 @@ class PythonPredictor:
         self.kafka_group_id = os.getenv('KAFKA_GROUP_ID');
         self.kafka_consumer_topic_name = os.getenv('KAFKA_CONSUMER_TOPIC_NAME');
         self.kafka_producer_topic_name = os.getenv('KAFKA_PRODUCER_TOPIC_NAME');
+        self.kafka_producer_status_update_topic_name =os.getenv('KAFKA_PRODUCER_STATUS_UPDATE_TOPIC_NAME')
 
 
         # establish connection with s3 BUCKET
@@ -103,8 +104,8 @@ class PythonPredictor:
 
         for message in self.kafka_consumer:
             print ("recieved message in topic: %s: key=%s value=%s" % (message.topic, message.key, message.value))
-       
             self.uuid = message.value
+            self.status_update_emit(self.uuid, "File processing started by heavy cruncher!")
 
             # process the message
             print('\njob request for UUID '+ self.uuid)
@@ -113,6 +114,7 @@ class PythonPredictor:
             self.worker_job_encode(self.uuid)
 
             # invoke producer to signal job finished
+            self.status_update_emit(self.uuid, "File processing finished.")
             self.producer_emit_job_finished_event(self.uuid)
 
             print('-----------------------------------------')
@@ -162,6 +164,19 @@ class PythonPredictor:
         except KafkaError:
             # Decide what to do if produce request failed...
             print("kafka_producer send failed for uuid:", uuid)
+            pass
+
+        # Successful result returns assigned partition and offset
+        print("message sent to topic:%s partition:%s offset:%s:" % (record_metadata.topic, record_metadata.partition, record_metadata.offset))        
+
+    def status_update_emit(self, uuid, status):
+
+        future = self.kafka_producer.send(self.kafka_producer_status_update_topic_name, key=bytes(uuid, 'utf-8'), value=(bytes(status, 'utf-8')))
+
+        try:
+            record_metadata = future.get(timeout=5)
+        except KafkaError:
+            print("kafka_producer status_update_emit send failed for uuid:", uuid)
             pass
 
         # Successful result returns assigned partition and offset
