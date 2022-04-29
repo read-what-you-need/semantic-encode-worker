@@ -84,6 +84,7 @@ class PythonPredictor:
                          group_id=self.kafka_group_id,
                          bootstrap_servers=[self.kafka_broker_host],
                          key_deserializer= stringDeserializer,
+                         max_poll_interval_ms=100,
                          value_deserializer=stringDeserializer)
             print('kakfa consumer connected')
 
