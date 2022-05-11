@@ -3,7 +3,6 @@ services:
     encode-worker:
         env_file:
         - .env
-        # remove the privileged option if it causes error
         privileged: true
         restart:
             always
@@ -12,9 +11,10 @@ services:
               reservations:
                 devices:
                 - driver: nvidia
-                  count: all
+                  count: 1
                   capabilities: [gpu]
         build:
+            dockerfile: Dockerfile.prod
             context: .
         volumes:
             - ./:/code/app
