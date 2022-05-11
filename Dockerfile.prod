@@ -1,0 +1,2 @@
+FROM soulbliss/gpu-python-processor:latest
+CMD ["python","-u", "main.py"]

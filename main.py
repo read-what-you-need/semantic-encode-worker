@@ -95,10 +95,8 @@ class PythonPredictor:
         # establish connection with kafka broker
         try:
             self.kafka_consumer = KafkaConsumer(self.kafka_consumer_topic_name,
-                         group_id=self.kafka_group_id,
                          bootstrap_servers=[self.kafka_broker_host],
                          key_deserializer= stringDeserializer,
-                         auto_offset_reset='earliest',
                          max_poll_interval_ms=100,
                          value_deserializer=stringDeserializer)
             print('kakfa consumer connected')
