@@ -99,8 +99,6 @@ class PythonPredictor:
                          group_id=self.kafka_group_id,
                          key_deserializer= stringDeserializer,
                          auto_offset_reset='earliest',
-                         max_poll_interval_ms=5000,
-                         max_poll_records=1,
                          max_poll_interval_ms=100,
                          value_deserializer=stringDeserializer)
             print('kakfa consumer connected')
