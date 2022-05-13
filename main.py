@@ -96,7 +96,11 @@ class PythonPredictor:
         try:
             self.kafka_consumer = KafkaConsumer(self.kafka_consumer_topic_name,
                          bootstrap_servers=[self.kafka_broker_host],
+                         group_id=self.kafka_group_id,
                          key_deserializer= stringDeserializer,
+                         auto_offset_reset='earliest',
+                         enable_auto_commit=True,
+                         auto_commit_interval_ms=1000, 
                          max_poll_interval_ms=100,
                          value_deserializer=stringDeserializer)
             print('kakfa consumer connected')
