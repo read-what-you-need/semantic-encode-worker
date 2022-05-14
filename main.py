@@ -72,7 +72,7 @@ class PythonPredictor:
         self.kafka_consumer_topic_name = os.getenv('KAFKA_CONSUMER_TOPIC_NAME');
         self.kafka_producer_topic_name = os.getenv('KAFKA_PRODUCER_TOPIC_NAME');
         self.kafka_producer_status_update_topic_name =os.getenv('KAFKA_PRODUCER_STATUS_UPDATE_TOPIC_NAME')
-
+        self.kafka_producer_fail_queue_topic_name =os.getenv('KAFKA_PRODUCER_FAIL_QUEUE_TOPIC_NAME')
 
         # establish connection with s3 BUCKET
         try:  
@@ -98,8 +98,8 @@ class PythonPredictor:
                          bootstrap_servers=[self.kafka_broker_host],
                          group_id=self.kafka_group_id,
                          key_deserializer= stringDeserializer,
+                         enable_auto_commit=False,
                          auto_offset_reset='earliest',
-                         max_poll_interval_ms=100,
                          value_deserializer=stringDeserializer)
             print('kakfa consumer connected')
 
@@ -122,29 +122,36 @@ class PythonPredictor:
         app_running_status_gauge.set(random.randint(5,20))
         push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)    
 
-        for message in self.kafka_consumer:
+        while True:
+            message_batch = self.kafka_consumer.poll()
             app_running_status_gauge.set(random.randint(5,20))
-            app_request_received.inc()
-            push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)
+            for partition_batch in message_batch.values():
+                for message in partition_batch:
+                    app_request_received.inc()
+                    push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)
+                    print ("recieved message in topic: %s: key=%s value=%s" % (message.topic, message.key, message.value))
+                    self.uuid = message.value
+                    self.status_update_emit(self.uuid, "File processing started by heavy cruncher!")
 
-            print ("recieved message in topic: %s: key=%s value=%s" % (message.topic, message.key, message.value))
-            self.uuid = message.value
-            self.status_update_emit(self.uuid, "File processing started by heavy cruncher!")
+                    # process the message
+                    print('\njob request for UUID '+ self.uuid)
 
-            # process the message
-            print('\njob request for UUID '+ self.uuid)
+                    # call worker process
+                    try:
+                        self.worker_job_encode(self.uuid)
+                    except Exception as error:
+                        self.producer_emit_add_to_fail_queue(self.uuid, error)
+                    else:
+                        # invoke producer to signal job finished
+                        self.status_update_emit(self.uuid, "File processing finished.")
+                        self.producer_emit_job_finished_event(self.uuid)
+                    app_successfully_finished.inc()
+                    push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)
+                    print('-----------------------------------------')
 
-            # call worker process
-           
-            self.worker_job_encode(self.uuid)
-
-            # invoke producer to signal job finished
-            self.status_update_emit(self.uuid, "File processing finished.")
-            self.producer_emit_job_finished_event(self.uuid)
-            app_successfully_finished.inc()
-            push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)
-            print('-----------------------------------------')
-
+            # commits the latest offsets returned by poll
+            self.kafka_consumer.commit()
+            
     @app_time_to_process_file.time()
     def worker_job_encode(self, uuid):
 
@@ -180,6 +187,23 @@ class PythonPredictor:
         with app_time_to_process_file.time():
             pass
 
+    
+    def producer_emit_add_to_fail_queue(self, uuid, error):
+
+        # Asynchronous by default
+        future = self.kafka_producer.send(self.kafka_producer_fail_queue_topic_name, key=bytes(self.kafka_consumer_topic_name+"_"+uuid, 'utf-8'), value=(bytes(str(error), 'utf-8')))
+
+        # Block for 'synchronous' sends
+        try:
+            record_metadata = future.get(timeout=60)
+        except KafkaError:
+            # Decide what to do if produce request failed...
+            print("producer_emit_add_to_fail_queue send failed for uuid:", uuid)
+            pass
+
+        # Successful result returns assigned partition and offset
+        print("message sent to topic:%s partition:%s offset:%s:" % (record_metadata.topic, record_metadata.partition, record_metadata.offset))   
+
     def producer_emit_job_finished_event(self, uuid):
 
         # Asynchronous by default
@@ -187,7 +211,7 @@ class PythonPredictor:
 
         # Block for 'synchronous' sends
         try:
-            record_metadata = future.get(timeout=5)
+            record_metadata = future.get(timeout=60)
         except KafkaError:
             # Decide what to do if produce request failed...
             print("kafka_producer send failed for uuid:", uuid)
