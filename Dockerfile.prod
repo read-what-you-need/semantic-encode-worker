@@ -1,2 +1,4 @@
 FROM soulbliss/gpu-python-processor:latest
+WORKDIR /code
+COPY ./ /code/
 CMD ["python","-u", "main.py"]
