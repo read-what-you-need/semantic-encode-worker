@@ -4,8 +4,6 @@ services:
         env_file:
         - .env
         privileged: true
-        restart:
-            always
         deploy:
             resources:
               reservations:

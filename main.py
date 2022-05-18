@@ -69,6 +69,7 @@ class PythonPredictor:
 
         self.kafka_broker_host=os.getenv('KAFKA_BROKER_HOST');
         self.kafka_group_id = os.getenv('KAFKA_GROUP_ID');
+        self.kafka_consumer_timeout = int(os.getenv('KAFKA_CONSUMER_TIMEOUT'))*1000;
         self.kafka_consumer_topic_name = os.getenv('KAFKA_CONSUMER_TOPIC_NAME');
         self.kafka_producer_topic_name = os.getenv('KAFKA_PRODUCER_TOPIC_NAME');
         self.kafka_producer_status_update_topic_name =os.getenv('KAFKA_PRODUCER_STATUS_UPDATE_TOPIC_NAME')
@@ -123,8 +124,10 @@ class PythonPredictor:
         push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)    
 
         while True:
-            message_batch = self.kafka_consumer.poll()
-            app_running_status_gauge.set(random.randint(5,20))
+            message_batch = self.kafka_consumer.poll(timeout_ms=self.kafka_consumer_timeout)
+            message_batch_length = len(message_batch.values())
+            if (message_batch_length == 0): break
+            app_running_status_gauge.set(random.randint(5,20))  
             for partition_batch in message_batch.values():
                 for message in partition_batch:
                     app_request_received.inc()

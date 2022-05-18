@@ -6,8 +6,6 @@ services:
         # remove the privileged option if it causes error
         privileged: true
         network_mode: "host"  
-        restart:
-            always
         deploy:
             resources:
               reservations:
