@@ -1,0 +1,15 @@
+[Unit]
+Description=Semantic processor
+After=docker.service systemd-networkd.service systemd-resolved.service
+Requires=docker.service
+Documentation=https://github.com/read-what-you-need/semantic-encode-worker
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+ExecStart=/usr/local/bin/docker-compose -f /home/ubuntu/semantic-encode-worker/docker-compose.prod.yml up   
+ExecStop=/usr/local/bin/docker-compose -f /home/ubuntu/semantic-encode-worker/docker-compose.prod.yml down -v
+
+[Install]
+WantedBy=multi-user.target
