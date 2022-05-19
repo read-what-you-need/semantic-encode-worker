@@ -127,7 +127,7 @@ class PythonPredictor:
             # consume messages
             message_batch = self.kafka_consumer.poll(timeout_ms=self.kafka_consumer_timeout)
             message_batch_length = len(message_batch.values())
-            if (message_batch_length == 0 and environment_type == "prod"): exit(100)
+            if (message_batch_length == 0 and environment_type == "prod"): exit(0)
             app_running_status_gauge.set(random.randint(5,20))  
             for partition_batch in message_batch.values():
                 for message in partition_batch:
