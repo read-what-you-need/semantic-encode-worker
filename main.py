@@ -34,10 +34,8 @@ aws_region_name = os.getenv('AWS_REGION_NAME')
 environment_type = os.getenv('env')
 device_type = os.getenv('device')
 
-if environment_type == "dev":
-    model_path= './models/distilroberta-base-msmarco-v2'
-if environment_type == "prod":
-    model_path= 'distilroberta-base-msmarco-v2'
+model_path = "./models/distilroberta-base-msmarco-v2"
+if not os.path.isdir(model_path): model_path= 'distilroberta-base-msmarco-v2'
 print('device-type:', device_type)
 
 # deserializers
@@ -120,13 +118,16 @@ class PythonPredictor:
         if os.path.exists(self.dir):
             shutil.rmtree(self.dir)
         os.makedirs(self.dir)
-        app_running_status_gauge.set(random.randint(5,20))
-        push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)    
 
         while True:
+            # send heartbeat
+            app_running_status_gauge.set(random.randint(5,20))
+            push_to_gateway(monitoring_push_gate , job=self.app_name, registry=registry)
+
+            # consume messages
             message_batch = self.kafka_consumer.poll(timeout_ms=self.kafka_consumer_timeout)
             message_batch_length = len(message_batch.values())
-            if (message_batch_length == 0): break
+            if (message_batch_length == 0 and environment_type == "prod"): exit(100)
             app_running_status_gauge.set(random.randint(5,20))  
             for partition_batch in message_batch.values():
                 for message in partition_batch:
